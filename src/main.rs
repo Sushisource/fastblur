@@ -1,6 +1,8 @@
 extern crate lodepng;
+extern crate rayon;
 
 use lodepng::{Bitmap, RGBA};
+use rayon::prelude::*;
 
 fn main() {
     let image = lodepng::decode32_file("in.png");
@@ -10,6 +12,7 @@ fn main() {
             let w = img.width;
             let h = img.height;
             let blurred = blur(img);
+            println!("Blur done.");
             lodepng::encode32_file("out.png", &blurred, w, h);
         }
         Err(e) => { eprintln!("Error reading image: {}", e) }
@@ -25,32 +28,39 @@ const BLUR_KERNEL: [[(f32, (i8, i8)); 5]; 5] = [
 ];
 
 fn blur(bits: Bitmap<RGBA>) -> Vec<RGBA> {
+    let imgw = bits.width;
     let buff = bits.buffer;
-    let mut result_buff = Vec::<RGBA>::new();
 
-    for cur_i in 0..buff.len() {
-        let pix = buff[cur_i];
-        let mut accum_r = 0.0;
-        let mut accum_g = 0.0;
-        let mut accum_b = 0.0;
+    (0..buff.len()).into_par_iter().fold(
+        || Vec::<RGBA>::new(),
+        |mut result_buff, cur_i| {
+            let pix = buff[cur_i];
+            let mut accum_r = 0.0;
+            let mut accum_g = 0.0;
+            let mut accum_b = 0.0;
 
-        for krow in BLUR_KERNEL.iter() {
-            for (coeff, (off_x, off_y)) in krow {
-                let relative_ix = lookup(*off_x as i32, *off_y as i32, cur_i as u32, bits.width as u32);
-                let px_val = if relative_ix < 0 {
-                    pix
-                } else {
-                    *buff.get(relative_ix as usize).unwrap_or(&pix)
-                };
-                accum_r += px_val.r as f32 * *coeff;
-                accum_g += px_val.g as f32 * *coeff;
-                accum_b += px_val.b as f32 * *coeff;
+            for krow in BLUR_KERNEL.iter() {
+                for (coeff, (off_x, off_y)) in krow {
+                    let relative_ix = lookup(*off_x as i32, *off_y as i32, cur_i as u32, imgw as u32);
+                    let px_val = if relative_ix < 0 {
+                        pix
+                    } else {
+                        *buff.get(relative_ix as usize).unwrap_or(&pix)
+                    };
+                    accum_r += px_val.r as f32 * *coeff;
+                    accum_g += px_val.g as f32 * *coeff;
+                    accum_b += px_val.b as f32 * *coeff;
+                }
             }
-        }
-        let result = RGBA::new(accum_r as u8, accum_g as u8, accum_b as u8, 255);
-        result_buff.push(result);
-    }
-    result_buff
+            let result = RGBA::new(accum_r as u8, accum_g as u8, accum_b as u8, 255);
+            result_buff.push(result);
+            result_buff
+        }).reduce(
+        || Vec::<RGBA>::new(),
+        |mut b1, b2| {
+            b1.extend(b2);
+            b1
+        })
 }
 
 /// Returns the index that should be used for lookup given a current pixel and an offset from it

@@ -6,3 +6,4 @@ authors = ["sjudge <sjudge@tableau.com>"]
 [dependencies]
 lodepng = "2.0.0"
 rgb = "0.8"
+rayon = "1.0"
