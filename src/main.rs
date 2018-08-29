@@ -7,7 +7,15 @@ use std::fs::File;
 use std::io::prelude::*;
 
 fn main() -> std::io::Result<()> {
-    let image = lodepng::decode32_file("in.png");
+    let args: Vec<String> = std::env::args().collect();
+    if args.len() != 3 {
+        eprintln!("Must pass exactly two args - input filename and output filename.\
+         Input is PNG output is BMP.");
+        std::process::exit(-1);
+    }
+    let infile = &args[1];
+    let outfile = &args[2];
+    let image = lodepng::decode32_file(infile);
     match image {
         Ok(img) => {
             println!("Image: {:?}", img);
@@ -17,7 +25,7 @@ fn main() -> std::io::Result<()> {
             println!("Blur done.");
             let bmp = make_bmp(blurred, w, h);
             println!("BMP encoded.");
-            File::create("out.bmp")?.write(bmp.as_slice())?;
+            File::create(outfile)?.write(bmp.as_slice())?;
             println!("BMP written.");
 //            lodepng::encode32_file("out.png", &blurred, w, h);
         }
