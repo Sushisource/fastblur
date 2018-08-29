@@ -72,7 +72,6 @@ fn blur(bits: Bitmap<RGBA>) -> Vec<RGBA> {
     (0..buff.len()).into_par_iter().fold(
         || Vec::<RGBA>::new(),
         |mut result_buff, cur_i| {
-            let pix = buff[cur_i];
             let mut accum_r = 0.0;
             let mut accum_g = 0.0;
             let mut accum_b = 0.0;
@@ -83,10 +82,11 @@ fn blur(bits: Bitmap<RGBA>) -> Vec<RGBA> {
                 for coeff in krow.iter() {
                     let (off_x, off_y) = get_offset(kx, ky);
                     let relative_ix = lookup(off_x as i32, off_y as i32, cur_i as u32, imgw as u32);
+                    // Edges blur to black
                     let px_val = if relative_ix < 0 {
-                        pix
+                        RGBA::new(0, 0, 0, 255)
                     } else {
-                        *buff.get(relative_ix as usize).unwrap_or(&pix)
+                        *buff.get(relative_ix as usize).unwrap_or(&RGBA::new(0, 0, 0, 255))
                     };
                     accum_r += px_val.r as f32 * *coeff;
                     accum_g += px_val.g as f32 * *coeff;
