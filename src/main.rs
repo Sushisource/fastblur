@@ -1,13 +1,10 @@
 extern crate image;
-extern crate rayon;
 #[macro_use]
 extern crate itertools;
+extern crate rayon;
 
-use image::Rgba;
 use image::RgbaImage;
-use rayon::iter::ParallelBridge;
-use rayon::prelude::*;
-use std::time::{Instant, Duration};
+use std::time::Instant;
 
 fn main() -> std::io::Result<()> {
     let args: Vec<String> = std::env::args().collect();
@@ -24,7 +21,6 @@ fn main() -> std::io::Result<()> {
             println!("Convert done.");
             let blur_s = Instant::now();
             let blurred = blur(converted);
-//            let blurred = img.blur(4.0);
             println!("Blur done in {:?}.", blur_s.elapsed());
             blurred.save(outfile)?;
             println!("{} written.", outfile);
@@ -47,9 +43,15 @@ fn blur(bits: RgbaImage) -> RgbaImage {
         gchan.push(pix.data[1]);
         bchan.push(pix.data[2]);
     }
-    let resr = new_blur(rchan, imgw, imgh, 3);
-    let resg = new_blur(gchan, imgw, imgh, 3);
-    let resb = new_blur(bchan, imgw, imgh, 3);
+    let sigma = 5;
+    let mut resr: Vec<u8> = Vec::new();
+    let mut resg: Vec<u8> = Vec::new();
+    let mut resb: Vec<u8> = Vec::new();
+    rayon::scope(|s| {
+        s.spawn(|_| resr = new_blur(rchan, imgw, imgh, sigma));
+        s.spawn(|_| resg = new_blur(gchan, imgw, imgh, sigma));
+        s.spawn(|_| resb = new_blur(bchan, imgw, imgh, sigma));
+    });
     let mut res: Vec<u8> = Vec::new();
     for (r, g, b) in izip!(resr.as_slice(), resg.as_slice(), resb.as_slice()) {
         res.push(*r);
@@ -101,20 +103,20 @@ fn box_blur_h(source: Vec<u8>, w: u32, h: u32, r: usize) -> Vec<u8> {
         for j in 0..r { val += source[ti + j] as f32; }
         for _ in 0..r + 1 {
             val += source[ri] as f32 - fv;
-            output[ti] = (val * iarr).round() as u8;
+            output[ti] = (val * iarr) as u8;
             ri += 1;
             ti += 1;
         }
         for _ in r + 1..w - r {
             val += source[ri] as f32 - source[li] as f32;
-            output[ti] = (val * iarr).round() as u8;
+            output[ti] = (val * iarr) as u8;
             ri += 1;
             li += 1;
             ti += 1;
         }
         for _ in w - r..w {
             val += lv - source[li] as f32;
-            output[ti] = (val * iarr).round() as u8;
+            output[ti] = (val * iarr) as u8;
             li += 1;
             ti += 1;
         }
@@ -139,20 +141,20 @@ fn box_blur_v(source: Vec<u8>, w: u32, h: u32, r: usize) -> Vec<u8> {
         for j in 0..r { val += source[ti + j * w] as f32; }
         for _ in 0..r + 1 {
             val += source[ri] as f32 - fv;
-            output[ti] = (val * iarr).round() as u8;
+            output[ti] = (val * iarr) as u8;
             ri += w;
             ti += w;
         }
         for _ in r + 1..h - r {
             val += source[ri] as f32 - source[li] as f32;
-            output[ti] = (val * iarr).round() as u8;
+            output[ti] = (val * iarr) as u8;
             ri += w;
             li += w;
             ti += w;
         }
         for _ in h - r..h {
             val += lv - source[li] as f32;
-            output[ti] = (val * iarr).round() as u8;
+            output[ti] = (val * iarr) as u8;
             li += w;
             ti += w;
         }
